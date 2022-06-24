@@ -23,7 +23,7 @@ from torchtext import data
 from torchtext.vocab import Vocab
 
 from torchtext.utils import download_from_url, extract_archive
-
+print("AAA")
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 model_dir_path = Path('model')
@@ -150,7 +150,7 @@ class Seq2seqTransformer(nn.Module):
         encoder_layer = TransformerEncoderLayer(
             d_model=embedding_size, nhead=nhead, dim_feedforward=dim_feedforward
         )
-        self.transformer_encoder = TransformerEncoderLayer(encoder_layer, num_layers=num_encoder_layers)
+        self.transformer_encoder = TransformerEncoder(encoder_layer, num_layers=num_encoder_layers)
 
         # decoderの定義
         self.token_embedding_tgt = TokenEmbedding(vocab_size_tgt, embedding_size)
