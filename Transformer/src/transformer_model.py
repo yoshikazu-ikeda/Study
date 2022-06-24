@@ -23,6 +23,9 @@ from torchtext import data
 from torchtext.vocab import Vocab
 
 from torchtext.utils import download_from_url, extract_archive
+
+from path_schema import DATA_PATH
+
 print("AAA")
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -30,8 +33,8 @@ model_dir_path = Path('model')
 if not model_dir_path.exists():
     model_dir_path.mkdir(parents=True)
 
-encoder_file_path = "./data/combined_beh.csv"
-decoder_file_path = "./data/hmm_annotation_list.dat"
+encoder_file_path = f"{DATA_PATH}/combined_beh.csv"
+decoder_file_path = f"{DATA_PATH}/hmm_annotation_list.dat"
 
 
 def read_texts(file_path):  # デコーダーの入力となる文章をリスト化する関数
