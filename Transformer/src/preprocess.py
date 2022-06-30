@@ -5,8 +5,6 @@ import torch
 from torch.nn.utils.rnn import pad_sequence
 
 
-
-
 def read_texts(file_path):  # デコーダーの入力となる文章をリスト化する関数
     texts = []
     with open(file_path, 'r') as file:
@@ -20,14 +18,30 @@ def read_texts(file_path):  # デコーダーの入力となる文章をリス�
 def read_seq(file_path):  # エンコーダーの入力となる時系列データをリスト化する関数(3次元リスト)
     sequences = []
     sequence = []
+    pad_list = [0.0] * 111
+    max_seq = 0
+    num_data = 0
     with open(file_path, 'r') as file:
         for row in csv.reader(file, delimiter='\t'):
-            if row[0] == '0':
+            if int(row[0]) == 0:
+                num_data += 1
                 sequences.append(sequence)
-                sequence = [list(row[1:112])]
+                sequence = [list(float(row[i]) for i in range(1, 112))]
             else:
-                sequence.append(list(row[1:112]))
-        sequences.pop(0)
+                if int(row[0]) > max_seq:
+                    max_seq = int(row[0])
+                sequence.append(list(float(row[i]) for i in range(1, 112)))
+        sequences.pop(0)  # 一番初めの空のリストを削除
+        print(num_data, max_seq)  # 1765,299
+
+    # 最大の時系列データ数に併せて0パディングする
+    for i in range(num_data - 1):
+        for j in range(max_seq - len(sequences[i]) + 1):
+            if max_seq - len(sequences[i]) + 1 == 0:
+                print("a")
+                break
+            sequences[i].append(pad_list)
+
     return sequences
 
 
@@ -65,7 +79,6 @@ def data_preprocess(texts_tgt, vocab_tgt, tokenizer_tgt):
             dtype=torch.long
         )
         data.append(tgt_tensor)
-
     return data
 
 
@@ -73,7 +86,5 @@ def generate_batch(data_batch):  # ミニバッチの作成
     batch_tgt = []
     for tgt in data_batch:
         batch_tgt.append(tgt)
-
-    batch_tgt = pad_sequence(batch_tgt, padding_value=PAD_IDX)  # 短い文章に対してパディングする
-
+    batch_tgt = pad_sequence(batch_tgt, padding_value=1)  # 短い文章に対してパディングする
     return batch_tgt
