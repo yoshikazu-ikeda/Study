@@ -11,9 +11,9 @@ from train import train
 from transformer_model import Seq2seqTransformer
 from preprocess import *
 from path_schema import *
+from evaluate import *
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
 
 # ファイルの読み込み
 encoder_file_path = f"{DATA_PATH}/combined_beh.csv"
@@ -24,11 +24,9 @@ decoder_file_path = f"{DATA_PATH}/hmm_annotation_list.dat"
 tokenizer_tgt = get_tokenizer("basic_english")  # 文章をすべて小文字にして単語ごとに分割する
 vocab_tgt = build_vocab(read_texts(decoder_file_path), tokenizer_tgt)  # 単語辞書の作成
 
-seq_src = read_seq(encoder_file_path)  # 入力時系列のリスト化
+seq_src = read_seq(encoder_file_path)  # 入力時系列のリスト化# 1764x300x111
 texts_tgt = read_texts(decoder_file_path)  # 文章をリスト化
 
-
-# ハイパーパラメータの設定
 batch_size = 128
 PAD_IDX = vocab_tgt['<pad>']
 START_IDX = vocab_tgt['<start>']
@@ -37,8 +35,8 @@ END_IDX = vocab_tgt['<end>']
 
 def main():
     vocab_size_tgt = len(vocab_tgt)
-    embedding_size = 200
-    nhead = 8
+    embedding_size = np.array(seq_src).shape[2]  # 111
+    nhead = 3  # 111の約数
     dim_feedforward = 100
     num_encoder_layer = 2
     num_decoder_layer = 2
@@ -46,15 +44,18 @@ def main():
 
     # 訓練データの構築
     train_data = data_preprocess(
-        texts_tgt=texts_tgt, vocab_tgt=vocab_tgt, tokenizer_tgt=tokenizer_tgt
+        seq_src=seq_src, texts_tgt=texts_tgt, vocab_tgt=vocab_tgt, tokenizer_tgt=tokenizer_tgt
     )
+    # print("train_data(エンコーダ側とデコーダ側の入力のデータの組)の要素数：", len(train_data))
+
     # ミニバッチを作る
-    train_iter = DataLoader(train_data, batch_size=batch_size, shuffle=False,
+    train_iter = DataLoader(train_data, batch_size=batch_size, shuffle=True,
                             collate_fn=generate_batch)  # シャッフルがFalseになっているから後で変える！
-    # print(list(train_iter)[0])  # 各列が文章に対応している. 今回の場合、(文章中の最大の単語数)x64x28 (64x28=1792)
+    # print("↓↓↓データローダーの第一要素↓↓↓\n", len(list(train_iter)[0][1][0]))  # 各列が文章に対応している. 今回の場合、(文章中の最大の単語数)x64x28 (64x28=1792)
 
     model = Seq2seqTransformer(
-        num_encoder_layer, num_decoder_layer, embedding_size, vocab_size_tgt, dim_feedforward, dropout, nhead
+        num_encoder_layer, num_decoder_layer, embedding_size, vocab_size_tgt, dim_feedforward, dropout,
+        nhead
     )
 
     for p in model.parameters():
@@ -69,7 +70,7 @@ def main():
     epoch = 100
     best_loss = float('Inf')
     best_model = None
-    patience = 10
+    patience = 100
     counter = 0
 
     for loop in range(1, epoch + 1):
@@ -95,11 +96,24 @@ def main():
             '**' if best_loss > loss_train else ''
         ))
 
+        best_model = model
+
         if counter > patience:
             break
 
         counter += 1
 
+    # モデルの保存
+    torch.save(best_model.state_dict(), f'{DATA_PATH}/translation_transformer.pth')
+    return best_model
+
 
 if __name__ == "__main__":
-    main()
+    # best_model = torch.load(f'{DATA_PATH}/translation_transformer.pth')
+    best_model = main()
+    seq = torch.tensor(seq_src[9])
+    predicted_sentence = translate(model=best_model, seq=seq, mask_src=None,
+                                   vocab_tgt=vocab_tgt,
+                                   seq_len_tgt=10,  # 最大系列長
+                                   START_IDX=START_IDX, END_IDX=END_IDX)
+    print(predicted_sentence)

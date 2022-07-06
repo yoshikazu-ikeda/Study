@@ -1,6 +1,7 @@
 import csv
 from collections import Counter
 
+import numpy as np
 import torch
 from torch.nn.utils.rnn import pad_sequence
 
@@ -32,13 +33,11 @@ def read_seq(file_path):  # エンコーダーの入力となる時系列デー�
                     max_seq = int(row[0])
                 sequence.append(list(float(row[i]) for i in range(1, 112)))
         sequences.pop(0)  # 一番初めの空のリストを削除
-        print(num_data, max_seq)  # 1765,299
 
     # 最大の時系列データ数に併せて0パディングする
     for i in range(num_data - 1):
         for j in range(max_seq - len(sequences[i]) + 1):
             if max_seq - len(sequences[i]) + 1 == 0:
-                print("a")
                 break
             sequences[i].append(pad_list)
 
@@ -71,20 +70,26 @@ def convert_indexes_to_text(indexes, vocab):
 
 
 # デコーダの入力になる単語をインデックスに変換
-def data_preprocess(texts_tgt, vocab_tgt, tokenizer_tgt):
+def data_preprocess(seq_src, texts_tgt, vocab_tgt, tokenizer_tgt):
     data = []
-    for tgt in texts_tgt:
+    for src, tgt in zip(seq_src, texts_tgt):
+        src_tensor = torch.tensor(
+            src, dtype=torch.float
+        )
         tgt_tensor = torch.tensor(
             convert_text_to_indexes(text=tgt, vocab=vocab_tgt, tokenizer=tokenizer_tgt),
             dtype=torch.long
         )
-        data.append(tgt_tensor)
+        data.append((torch.t(src_tensor), tgt_tensor))
     return data
 
 
 def generate_batch(data_batch):  # ミニバッチの作成
+    batch_src = []
     batch_tgt = []
-    for tgt in data_batch:
+    for src, tgt in data_batch:
+        batch_src.append(src)
         batch_tgt.append(tgt)
+
     batch_tgt = pad_sequence(batch_tgt, padding_value=1)  # 短い文章に対してパディングする
-    return batch_tgt
+    return batch_src, batch_tgt
