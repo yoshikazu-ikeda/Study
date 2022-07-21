@@ -16,13 +16,12 @@ def train(model, data, optimizer, criterion, PAD_IDX):
 
         input_tgt = tgt[:-1, :]  # 最後の要素を削る
         mask_src, mask_tgt, padding_mask_src, padding_mask_tgt = create_mask(src, input_tgt, PAD_IDX)
-        # print('src:{}\ntgt:{}'.format(src.shape, input_tgt.shape))
 
         logit = model.forward(
             src=src, tgt=input_tgt,
             mask_src=mask_src, mask_tgt=mask_tgt,
-            padding_mask_src=padding_mask_src, padding_mask_tgt=None,
-            memory_key_padding_mask=None
+            padding_mask_src=padding_mask_src, padding_mask_tgt=padding_mask_tgt,
+            memory_key_padding_mask=padding_mask_src
         )
 
         optimizer.zero_grad()

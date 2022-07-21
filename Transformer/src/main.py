@@ -6,6 +6,7 @@ from torch.utils.data import DataLoader
 from torchtext.data import get_tokenizer
 import time
 import numpy as np
+from collections import OrderedDict
 
 from train import train
 from transformer_model import Seq2seqTransformer
@@ -27,21 +28,21 @@ vocab_tgt = build_vocab(read_texts(decoder_file_path), tokenizer_tgt)  # 単語�
 seq_src = read_seq(encoder_file_path)  # 入力時系列のリスト化# 1764x300x111
 texts_tgt = read_texts(decoder_file_path)  # 文章をリスト化
 
-batch_size = 128
+batch_size = 200
 PAD_IDX = vocab_tgt['<pad>']
 START_IDX = vocab_tgt['<start>']
 END_IDX = vocab_tgt['<end>']
 
+vocab_size_tgt = len(vocab_tgt)
+embedding_size = np.array(seq_src).shape[2]  # 111
+nhead = 3  # 111の約数
+dim_feedforward = 128
+num_encoder_layer = 6
+num_decoder_layer = 6
+dropout = 0.1
+
 
 def main():
-    vocab_size_tgt = len(vocab_tgt)
-    embedding_size = np.array(seq_src).shape[2]  # 111
-    nhead = 3  # 111の約数
-    dim_feedforward = 100
-    num_encoder_layer = 2
-    num_decoder_layer = 2
-    dropout = 0.1
-
     # 訓練データの構築
     train_data = data_preprocess(
         seq_src=seq_src, texts_tgt=texts_tgt, vocab_tgt=vocab_tgt, tokenizer_tgt=tokenizer_tgt
@@ -68,9 +69,9 @@ def main():
 
     # 学習
     epoch = 100
-    best_loss = float('Inf')
+    best_loss = float('-Inf')
     best_model = None
-    patience = 100
+    patience = 50
     counter = 0
 
     for loop in range(1, epoch + 1):
@@ -109,10 +110,20 @@ def main():
 
 
 if __name__ == "__main__":
-    # best_model = torch.load(f'{DATA_PATH}/translation_transformer.pth')
-    best_model = main()
-    seq = torch.tensor(seq_src[9])
-    predicted_sentence = translate(model=best_model, seq=seq, mask_src=None,
+    # 学習済みモデルの読み込み
+    best_model = Seq2seqTransformer(
+        num_encoder_layer, num_decoder_layer, embedding_size, vocab_size_tgt, dim_feedforward, dropout,
+        nhead
+    ).to(device)
+    best_model.load_state_dict(torch.load(f'{DATA_PATH}/translation_transformer.pth', map_location="cpu"))
+
+    # best_model = main()
+    mask_src = torch.zeros((300, 300), device=device).type(torch.bool)
+    # seq = torch.tensor(seq_src[667])
+    # print(seq.shape)
+    seq2 = torch.tensor(np.array(np.random.randn(300, 111))).float()
+    print(seq2.shape)
+    predicted_sentence = translate(model=best_model, seq=seq2,
                                    vocab_tgt=vocab_tgt,
                                    seq_len_tgt=10,  # 最大系列長
                                    START_IDX=START_IDX, END_IDX=END_IDX)

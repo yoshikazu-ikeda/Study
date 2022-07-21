@@ -19,7 +19,7 @@ def read_texts(file_path):  # デコーダーの入力となる文章をリス�
 def read_seq(file_path):  # エンコーダーの入力となる時系列データをリスト化する関数(3次元リスト)
     sequences = []
     sequence = []
-    pad_list = [0.0] * 111
+    pad_list = [0] * 111
     max_seq = 0
     num_data = 0
     with open(file_path, 'r') as file:
@@ -32,10 +32,11 @@ def read_seq(file_path):  # エンコーダーの入力となる時系列デー�
                 if int(row[0]) > max_seq:
                     max_seq = int(row[0])
                 sequence.append(list(float(row[i]) for i in range(1, 112)))
+        sequences.append(sequence)  # 最後を付け足す
         sequences.pop(0)  # 一番初めの空のリストを削除
 
     # 最大の時系列データ数に併せて0パディングする
-    for i in range(num_data - 1):
+    for i in range(num_data):
         for j in range(max_seq - len(sequences[i]) + 1):
             if max_seq - len(sequences[i]) + 1 == 0:
                 break
@@ -91,5 +92,5 @@ def generate_batch(data_batch):  # ミニバッチの作成
         batch_src.append(src)
         batch_tgt.append(tgt)
 
-    batch_tgt = pad_sequence(batch_tgt, padding_value=1)  # 短い文章に対してパディングする
+    batch_tgt = pad_sequence(batch_tgt, padding_value=1)  # 短い文章に対して<pad>でパディングする
     return batch_src, batch_tgt

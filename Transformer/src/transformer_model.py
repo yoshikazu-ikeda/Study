@@ -1,4 +1,5 @@
 import math
+import sys
 
 import numpy as np
 import torch
@@ -35,17 +36,17 @@ class Seq2seqTransformer(nn.Module):
     def forward(self, src: Tensor, tgt: Tensor, mask_src: Tensor, mask_tgt: Tensor, padding_mask_src: Tensor,
                 padding_mask_tgt: Tensor,
                 memory_key_padding_mask: Tensor):
-        embedding_src = self.positional_encoding(src.permute((2, 0, 1)))  # [111x128x300]
-        memory = self.transformer_encoder(embedding_src)
+        embedding_src = self.positional_encoding(src.permute((2, 0, 1)))  # [300,128,111]
+        memory = self.transformer_encoder(embedding_src, mask_src, src_key_padding_mask=padding_mask_src)
         embedding_tgt = self.positional_encoding(self.token_embedding_tgt(tgt))
-        # print('embedding_tgt in train:{}\nmemory in train:{}'.format(embedding_tgt.shape, memory.shape))
         outs = self.transformer_decoder(
-            embedding_tgt, memory, mask_tgt, None, padding_mask_tgt
+            embedding_tgt, memory, mask_tgt, None, padding_mask_tgt, memory_key_padding_mask
         )
         return self.output(outs)
 
     def encode(self, src: Tensor, mask_src: Tensor):
-        return self.transformer_encoder(self.positional_encoding(src))
+        print(src.shape)
+        return self.transformer_encoder(self.positional_encoding(src), mask_src)
 
     def decode(self, tgt: Tensor, memory: Tensor, mask_tgt: Tensor):
         # print(self.positional_encoding(self.token_embedding_tgt(tgt)).shape)  # 1x1x111
@@ -88,8 +89,12 @@ def create_mask(src, tgt, PAD_IDX):  # tgt:input_tgt
     mask_src = torch.zeros((seq_len_src, seq_len_src), device=device).type(torch.bool)  # 300x300の全てFalseの行列
     mask_tgt = generate_square_subsequent_mask(seq_len_tgt, PAD_IDX)  # 上三角が全て-infでそれ以外が0の9x9行列
 
-    padding_mask_tgt = torch.t(torch.tensor(tgt.clone().detach() == PAD_IDX))  # PAD_IDXの場所だけをTrueにする,ここ怪しいかも
-    padding_mask_src = src  # そもそもPAD＿IDXで埋めてないからこの処理いらない
+    padding_mask_tgt = (tgt == PAD_IDX).transpose(0, 1)  # PAD_IDXの場所だけをTrueにする,ここ怪しいかも
+    padding_mask_src = torch.zeros(src.size()[0], src.size()[2], dtype=torch.bool)
+    for i in range(src.size()[0]):
+        for j in range(src.size()[2]):
+            padding_mask_src[i, j] = (src[i, :, j].tolist() == [0] * 111)
+
     return mask_src, mask_tgt, padding_mask_src, padding_mask_tgt
 
 
