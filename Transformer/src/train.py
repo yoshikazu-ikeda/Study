@@ -11,11 +11,13 @@ def train(model, data, optimizer, criterion, PAD_IDX):
     losses = 0
 
     for src, tgt in data:
-        src = torch.stack(src)  # 128x111x300
-        tgt = tgt.clone().detach()  # 10x128
+        src = torch.stack(src)  # バッチサイズx埋め込み次元数x時系列データの数
+        tgt = tgt.clone().detach()  # 文章の単語数xバッチサイズ
 
         input_tgt = tgt[:-1, :]  # 最後の要素を削る
         mask_src, mask_tgt, padding_mask_src, padding_mask_tgt = create_mask(src, input_tgt, PAD_IDX)
+
+        optimizer.zero_grad()
 
         logit = model.forward(
             src=src, tgt=input_tgt,
@@ -23,8 +25,6 @@ def train(model, data, optimizer, criterion, PAD_IDX):
             padding_mask_src=padding_mask_src, padding_mask_tgt=padding_mask_tgt,
             memory_key_padding_mask=padding_mask_src
         )
-
-        optimizer.zero_grad()
 
         output_tgt = tgt[1:, :]
         loss = criterion(logit.reshape(-1, logit.shape[-1]), output_tgt.reshape(-1))

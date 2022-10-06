@@ -22,12 +22,17 @@ def read_seq(file_path):  # エンコーダーの入力となる時系列デー�
     pad_list = [0] * 111
     max_seq = 0
     num_data = 0
+    count = 0
     with open(file_path, 'r') as file:
         for row in csv.reader(file, delimiter='\t'):
             if int(row[0]) == 0:
+                count = count + 1
                 num_data += 1
                 sequences.append(sequence)
+
                 sequence = [list(float(row[i]) for i in range(1, 112))]
+                # if count == 20:
+                #     break
             else:
                 if int(row[0]) > max_seq:
                     max_seq = int(row[0])
@@ -42,7 +47,9 @@ def read_seq(file_path):  # エンコーダーの入力となる時系列デー�
                 break
             sequences[i].append(pad_list)
 
-    return sequences
+    new_sequences = np.array(sequences)[:, 0::3, :]
+
+    return new_sequences
 
 
 def build_vocab(texts, tokenizer):  # 単語辞書の作成

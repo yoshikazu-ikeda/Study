@@ -25,10 +25,10 @@ def translate(model, seq, vocab_tgt, seq_len_tgt, START_IDX, END_IDX):
 
 
 def greedy_decode(model, src, mask_src, seq_len_tgt, START_IDX, END_IDX):
-    src = src.to(device)  #300x111
+    src = src.to(device)  # 300x111
     mask_src = mask_src.to(device)
 
-    memory = model.encode(src.unsqueeze(1), mask_src)  #300x1x111
+    memory = model.encode(src.unsqueeze(1), mask_src)  # 300x1x111
     ys = torch.ones(1, 1).fill_(START_IDX).type(torch.long).to(device)
 
     for i in range(seq_len_tgt - 1):
@@ -42,7 +42,7 @@ def greedy_decode(model, src, mask_src, seq_len_tgt, START_IDX, END_IDX):
         output = output.transpose(0, 1)
         output = model.output(output[:, -1])
         _, next_word = torch.max(output, dim=1)
-        print(_)
+        # print(_)
         # guess_words = torch.argsort(output, dim = 1)
         # next_word = guess_words.tolist().index(1)
         next_word = next_word.item()
@@ -52,3 +52,5 @@ def greedy_decode(model, src, mask_src, seq_len_tgt, START_IDX, END_IDX):
             break
 
     return ys
+
+

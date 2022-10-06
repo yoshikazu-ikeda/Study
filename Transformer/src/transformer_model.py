@@ -9,6 +9,8 @@ from torch.nn import (
     TransformerEncoder, TransformerDecoder,
     TransformerEncoderLayer, TransformerDecoderLayer
 )
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -45,7 +47,6 @@ class Seq2seqTransformer(nn.Module):
         return self.output(outs)
 
     def encode(self, src: Tensor, mask_src: Tensor):
-        print(src.shape)
         return self.transformer_encoder(self.positional_encoding(src), mask_src)
 
     def decode(self, tgt: Tensor, memory: Tensor, mask_tgt: Tensor):
@@ -69,16 +70,22 @@ class PositionalEncoding(nn.Module):
         super(PositionalEncoding, self).__init__()
 
         den = torch.exp(-torch.arange(0, embedding_size, 2) * math.log(10000) / embedding_size)  # 56
+        # print("denのshape",den.shape)
         pos = torch.arange(0, maxlen).reshape(maxlen, 1)  # [5000,1]
+        # print("posのshape",pos.shape)
         embedding_pos = torch.zeros((maxlen, embedding_size))  # [5000,111]
         embedding_pos[:, 0::2] = torch.sin(pos * den)
         embedding_pos[:, 1::2] = torch.cos(pos * den[:-1])  # [5000,111]
-        embedding_pos = embedding_pos.unsqueeze(-2)  # [5000,1,111]
+        embedding_pos = embedding_pos.unsqueeze(0)  # [1,5000,111]
+        # print("embedding_posの形状：", embedding_pos.shape)
+
         self.dropout = nn.Dropout(dropout)
         self.register_buffer('embedding_pos', embedding_pos)
 
     def forward(self, token_embedding: Tensor):
-        return self.dropout(token_embedding + self.embedding_pos[:token_embedding.shape[0], :])
+        # print("token_embedding", token_embedding.shape)  # [18,10,111]
+        # print("embedding_posの形状", self.embedding_pos[:, :token_embedding.shape[1], :].shape)  # [1,10,111]
+        return self.dropout(token_embedding + self.embedding_pos[:, :token_embedding.shape[1], :])
 
 
 ###マスキング###
