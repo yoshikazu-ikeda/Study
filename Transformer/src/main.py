@@ -4,12 +4,13 @@ import sys
 import torch.nn
 from torch import nn
 from torch.utils.data import DataLoader
+from torch.utils.data import random_split
 from torchtext.data import get_tokenizer
 import time
 import numpy as np
 from collections import OrderedDict
 
-from train import train
+from train import train, evaluate
 from transformer_model import Seq2seqTransformer
 from preprocess import *
 from path_schema import *
@@ -19,8 +20,8 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 # ファイルの読み込み
 encoder_file_path = f"{DATA_PATH}/new_beh.csv"
-decoder_file_path = f"{DATA_PATH}/hmm_annotation_list.dat"
-# decoder_file_path = f"{DATA_PATH}/hmm_ant_1.csv"
+# decoder_file_path = f"{DATA_PATH}/hmm_annotation_list.dat"
+decoder_file_path = f"{DATA_PATH}/hmm_ant_1.csv"
 # encoder_file_path = "//fukuoka/share/YoshikazuIkeda/Transformer/data/capdata/combined_beh.csv"
 # decoder_file_path = "//fukuoka/share/YoshikazuIkeda/Transformer/data/capdata/hmm_annotation_list.dat"
 
@@ -28,11 +29,10 @@ tokenizer_tgt = get_tokenizer("basic_english")  # 文章をすべて小文字に
 vocab_tgt = build_vocab(read_texts(decoder_file_path), tokenizer_tgt)  # 単語辞書の作成
 
 seq_src = read_seq(encoder_file_path)  # 入力時系列のリスト化# 1764x300x111
-# print('seq_srcの形状', np.array(seq_src).shape)
 
 texts_tgt = read_texts(decoder_file_path)  # 文章をリスト化
 
-batch_size = 512
+batch_size = 20
 PAD_IDX = vocab_tgt['<pad>']
 START_IDX = vocab_tgt['<start>']
 END_IDX = vocab_tgt['<end>']
@@ -40,9 +40,9 @@ END_IDX = vocab_tgt['<end>']
 vocab_size_tgt = len(vocab_tgt)
 embedding_size = np.array(seq_src).shape[2]  # 111
 nhead = 3  # 111の約数
-dim_feedforward = 512
-num_encoder_layer = 4
-num_decoder_layer = 4
+dim_feedforward = 1024
+num_encoder_layer = 3
+num_decoder_layer = 3
 dropout = 0.4
 
 
@@ -51,12 +51,21 @@ def main():
     train_data = data_preprocess(
         seq_src=seq_src, texts_tgt=texts_tgt, vocab_tgt=vocab_tgt, tokenizer_tgt=tokenizer_tgt
     )
-    # print("train_data(エンコーダ側とデコーダ側の入力のデータの組)の要素数：", len(train_data))
+
+    # print("↓↓↓データローダーの第一要素↓↓↓\n", len(list(train_iter)[0][1][0]))  # 各列が文章に対応している. 今回の場合、(文章中の最大の単語数)x64x28 (64x28=1792)
+    n_samples = len(train_data)
+    train_size = int(len(train_data) * 0.8)
+    val_size = n_samples - train_size
+
+    train_dataset, val_dataset = torch.utils.data.random_split(train_data, [train_size, val_size])
+    # print(len(train_dataset))
+    # print(len(val_dataset))
 
     # ミニバッチを作る
-    train_iter = DataLoader(train_data, batch_size=batch_size, shuffle=True,
+    train_iter = DataLoader(train_dataset, batch_size=batch_size, shuffle=True,
                             collate_fn=generate_batch)
-    # print("↓↓↓データローダーの第一要素↓↓↓\n", len(list(train_iter)[0][1][0]))  # 各列が文章に対応している. 今回の場合、(文章中の最大の単語数)x64x28 (64x28=1792)
+    valid_iter = DataLoader(val_dataset, batch_size=batch_size, shuffle=True,
+                            collate_fn=generate_batch)
 
     model = Seq2seqTransformer(
         num_encoder_layer, num_decoder_layer, embedding_size, vocab_size_tgt, dim_feedforward, dropout,
@@ -75,7 +84,7 @@ def main():
     epoch = 1000
     best_loss = float('Inf')
     best_model = None
-    patience = 400
+    patience = 10
     counter = 0
 
     for loop in range(1, epoch + 1):
@@ -88,23 +97,25 @@ def main():
         elapsed_time = time.time() - start_time
 
         # 検証データを作ってから
-        # loss_valid=evaluate(
-        #     model=model,data=valid_iter,criterion=criterion,PAD_IDX=PAD_IDX
-        # )
+        loss_valid = evaluate(
+            model=model, data=valid_iter, criterion=criterion, PAD_IDX=PAD_IDX
+        )
 
-        print('[{}/{}] train loss: {:.2f}  [{}{:.0f}s] count: {}, {}'.format(
+        print('[{}/{}] train loss: {:.2f}, valid loss: {:.2f}  [{}{:.0f}s] count: {}, {}'.format(
             loop, epoch,
-            loss_train,
+            loss_train, loss_valid,
             str(int(math.floor(elapsed_time / 60))) + 'm' if math.floor(elapsed_time / 60) > 0 else '',
             elapsed_time % 60,
             counter,
-            '**' if best_loss > loss_train else ''
+            '**' if best_loss > loss_valid else ''
         ))
-        if best_loss > loss_train:
-            best_loss = loss_train
-            best_model = model
 
-        if counter == patience:
+        if best_loss > loss_valid:
+            best_loss = loss_valid
+            best_model = model
+            counter = 0
+
+        if counter > patience:
             break
 
         counter += 1
@@ -121,10 +132,8 @@ if __name__ == "__main__":
     #     nhead
     # ).to(device)
     # best_model.load_state_dict(torch.load(f'{DATA_PATH}/translation_transformer_10ver.pth', map_location="cpu"))
-    # print(seq_src[1764,:,:])
     shape = np.array(seq_src).shape
-    # print(shape)
-    # print(np.array(texts_tgt).shape)
+    fake_src = torch.tensor(np.random.randn(179, 111)).float()
     best_model = main()
     mask_src = torch.zeros((shape[1], shape[1]), device=device).type(torch.bool)
     for i in range(shape[0]):
@@ -136,21 +145,9 @@ if __name__ == "__main__":
         list = " ".join(predicted_sentence)
         # print(list)
         print('予測:{}|正解:{}'.format(' '.join(predicted_sentence).strip('<start>').strip('<end>'), texts_tgt[i]))
-        # print('|予測：',' '.join(predicted_sentence).strip('<start>').strip('<end>'))
-        # print("|正解*：",texts_tgt[i])
-    # print(seq_src[0], texts_tgt[0])
-    # seq2 = torch.zeros((179, 111)).float()
-    # print(seq.shape)
-    # seq3 = torch.tensor(np.array(np.random.randn(179, 111))).float()
-    # print(seq2.shape)
 
-    # predicted_sentence2 = translate(model=best_model, seq=seq2,
-    #                                vocab_tgt=vocab_tgt,
-    #                                seq_len_tgt=10,  # 最大系列長
-    #                                START_IDX=START_IDX, END_IDX=END_IDX)
-    # predicted_sentence3 = translate(model=best_model, seq=seq3,
-    #                                vocab_tgt=vocab_tgt,
-    #                                seq_len_tgt=10,  # 最大系列長
-    #                                START_IDX=START_IDX, END_IDX=END_IDX)
-    # print(predicted_sentence2)
-    # print(predicted_sentence3)
+    fake_predict = translate(model=best_model, seq=fake_src,
+                             vocab_tgt=vocab_tgt,
+                             seq_len_tgt=10,  # 最大系列長
+                             START_IDX=START_IDX, END_IDX=END_IDX)
+    print('fake:', fake_predict)

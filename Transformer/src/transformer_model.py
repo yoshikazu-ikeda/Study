@@ -90,8 +90,8 @@ class PositionalEncoding(nn.Module):
 
 ###マスキング###
 def create_mask(src, tgt, PAD_IDX):  # tgt:input_tgt
-    seq_len_src = src.size()[2]  # 300
-    seq_len_tgt = tgt.size()[0]  # 9
+    seq_len_src = np.array(src).shape[2]  # 300
+    seq_len_tgt = np.array(tgt).shape[0]  # 9
 
     mask_src = torch.zeros((seq_len_src, seq_len_src), device=device).type(torch.bool)  # 300x300の全てFalseの行列
     mask_tgt = generate_square_subsequent_mask(seq_len_tgt, PAD_IDX)  # 上三角が全て-infでそれ以外が0の9x9行列

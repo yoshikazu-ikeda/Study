@@ -31,8 +31,8 @@ def read_seq(file_path):  # エンコーダーの入力となる時系列デー�
                 sequences.append(sequence)
 
                 sequence = [list(float(row[i]) for i in range(1, 112))]
-                # if count == 20:
-                #     break
+                if count == 20:
+                    break
             else:
                 if int(row[0]) > max_seq:
                     max_seq = int(row[0])
@@ -47,9 +47,9 @@ def read_seq(file_path):  # エンコーダーの入力となる時系列デー�
                 break
             sequences[i].append(pad_list)
 
-    new_sequences = np.array(sequences)[:, 0::3, :]
+    # new_sequences = np.array(sequences)[:, 0::10, :]
 
-    return new_sequences
+    return sequences
 
 
 def build_vocab(texts, tokenizer):  # 単語辞書の作成

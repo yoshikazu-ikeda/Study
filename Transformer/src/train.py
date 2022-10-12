@@ -40,19 +40,20 @@ def evaluate(model, data, criterion, PAD_IDX):
     model.eval()
     losses = 0
     for src, tgt in data:
-        # src = src.to(device)
-        # tgt = tgt.to(device)
+        src = torch.stack(src)  # バッチサイズx埋め込み次元数x時系列データの数
+        tgt = tgt.clone().detach()  # 文章の単語数xバッチサイズ
 
-        input_tgt = tgt[:-1, 1]  # ここは変更すべき
+        input_tgt = tgt[:-1, :]  # ここは変更すべき
 
-        mask_tgt, padding_mask_tgt = create_mask(tgt, PAD_IDX)
+        mask_src, mask_tgt, padding_mask_src, padding_mask_tgt = create_mask(src, input_tgt, PAD_IDX)
 
-        logit = model(
+        logit = model.forward(
             src=src, tgt=input_tgt,
-            mask_tgt=mask_tgt,
-            padding_mask_tgt=padding_mask_tgt
+            mask_src=mask_src, mask_tgt=mask_tgt,
+            padding_mask_src=padding_mask_src, padding_mask_tgt=padding_mask_tgt,
+            memory_key_padding_mask=padding_mask_src
         )
-        output_tgt = tgt[-1:, :]
+        output_tgt = tgt[1:, :]
         loss = criterion(logit.reshape(-1, logit.shape[-1]), output_tgt.reshape(-1))
         losses += loss.item()
 
