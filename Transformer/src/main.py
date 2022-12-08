@@ -32,18 +32,19 @@ seq_src = read_seq(encoder_file_path)  # 入力時系列のリスト化# 1764x30
 
 texts_tgt = read_texts(decoder_file_path)  # 文章をリスト化
 
-batch_size = 20
+batch_size = 10
 PAD_IDX = vocab_tgt['<pad>']
 START_IDX = vocab_tgt['<start>']
 END_IDX = vocab_tgt['<end>']
 
 vocab_size_tgt = len(vocab_tgt)
+# print("語彙数:",vocab_size_tgt)
 embedding_size = np.array(seq_src).shape[2]  # 111
 nhead = 3  # 111の約数
-dim_feedforward = 1024
+dim_feedforward = 512
 num_encoder_layer = 3
 num_decoder_layer = 3
-dropout = 0.4
+dropout = 0.1
 
 
 def main():
@@ -78,7 +79,7 @@ def main():
 
     model = model.to(device)
     criterion = torch.nn.CrossEntropyLoss(ignore_index=PAD_IDX)
-    optimizer = torch.optim.Adam(model.parameters())
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.001, betas=(0.9, 0.999), eps=1e-09)
 
     # 学習
     epoch = 1000
@@ -96,7 +97,7 @@ def main():
 
         elapsed_time = time.time() - start_time
 
-        # 検証データを作ってから
+        # 検証データ
         loss_valid = evaluate(
             model=model, data=valid_iter, criterion=criterion, PAD_IDX=PAD_IDX
         )
@@ -131,9 +132,10 @@ if __name__ == "__main__":
     #     num_encoder_layer, num_decoder_layer, embedding_size, vocab_size_tgt, dim_feedforward, dropout,
     #     nhead
     # ).to(device)
-    # best_model.load_state_dict(torch.load(f'{DATA_PATH}/translation_transformer_10ver.pth', map_location="cpu"))
+    # best_model.load_state_dict(torch.load(f'{DATA_PATH}/translation_transformer_allver.pth', map_location="cpu"))
     shape = np.array(seq_src).shape
-    fake_src = torch.tensor(np.random.randn(179, 111)).float()
+    # fake_src = torch.tensor(np.random.randn(300, 111)).float()
+    ##ここで学習を行う
     best_model = main()
     mask_src = torch.zeros((shape[1], shape[1]), device=device).type(torch.bool)
     for i in range(shape[0]):
@@ -142,12 +144,12 @@ if __name__ == "__main__":
                                        vocab_tgt=vocab_tgt,
                                        seq_len_tgt=10,  # 最大系列長
                                        START_IDX=START_IDX, END_IDX=END_IDX)
-        list = " ".join(predicted_sentence)
+        # list = " ".join(predicted_sentence)
         # print(list)
-        print('予測:{}|正解:{}'.format(' '.join(predicted_sentence).strip('<start>').strip('<end>'), texts_tgt[i]))
+        # print('予測:{}|正解:{}'.format(' '.join(predicted_sentence).strip('<start>').strip('<end>'), texts_tgt[i]))
 
-    fake_predict = translate(model=best_model, seq=fake_src,
-                             vocab_tgt=vocab_tgt,
-                             seq_len_tgt=10,  # 最大系列長
-                             START_IDX=START_IDX, END_IDX=END_IDX)
-    print('fake:', fake_predict)
+    # fake_predict = translate(model=best_model, seq=fake_src,
+    #                          vocab_tgt=vocab_tgt,
+    #                          seq_len_tgt=10,  # 最大系列長
+    #                          START_IDX=START_IDX, END_IDX=END_IDX)
+    # print('fake:', fake_predict)

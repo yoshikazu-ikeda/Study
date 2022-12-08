@@ -47,9 +47,29 @@ def read_seq(file_path):  # エンコーダーの入力となる時系列デー�
                 break
             sequences[i].append(pad_list)
 
+    # どのくらい抽出したいか
+    # n = 15
+    # new_sequences = np.zeros((np.array(sequences).shape[0], n, 111))
+    # for i in range(np.array(sequences).shape[0]):
+        # print(np.array(sequences))
+        # 20個に縮約する
+
+        # step = set_divisor(np.array(sequences).shape[0], n)
+        # if step == 1:
+        #     new_sequences[i, :, :] = np.array(sequences[i])[0:n, :]
+        # else:
+        #     new_sequences[i, :, :] = np.array(sequences[i])[0::step, :]
+
+    # print(new_sequences.shape)
     # new_sequences = np.array(sequences)[:, 0::10, :]
 
     return sequences
+
+
+##いくつごとに抜き出すのかを計算
+def set_divisor(n_in, n_out):
+    divisor = n_in // n_out
+    return divisor
 
 
 def build_vocab(texts, tokenizer):  # 単語辞書の作成
@@ -98,6 +118,5 @@ def generate_batch(data_batch):  # ミニバッチの作成
     for src, tgt in data_batch:
         batch_src.append(src)
         batch_tgt.append(tgt)
-
     batch_tgt = pad_sequence(batch_tgt, padding_value=1)  # 短い文章に対して<pad>でパディングする
     return batch_src, batch_tgt

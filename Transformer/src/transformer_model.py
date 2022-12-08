@@ -39,6 +39,7 @@ class Seq2seqTransformer(nn.Module):
                 padding_mask_tgt: Tensor,
                 memory_key_padding_mask: Tensor):
         embedding_src = self.positional_encoding(src.permute((2, 0, 1)))  # [300,128,111]
+        # embedding_src = src.permute((2,0,1))
         memory = self.transformer_encoder(embedding_src, mask_src, src_key_padding_mask=padding_mask_src)
         embedding_tgt = self.positional_encoding(self.token_embedding_tgt(tgt))
         outs = self.transformer_decoder(
@@ -70,21 +71,16 @@ class PositionalEncoding(nn.Module):
         super(PositionalEncoding, self).__init__()
 
         den = torch.exp(-torch.arange(0, embedding_size, 2) * math.log(10000) / embedding_size)  # 56
-        # print("denのshape",den.shape)
         pos = torch.arange(0, maxlen).reshape(maxlen, 1)  # [5000,1]
-        # print("posのshape",pos.shape)
         embedding_pos = torch.zeros((maxlen, embedding_size))  # [5000,111]
         embedding_pos[:, 0::2] = torch.sin(pos * den)
         embedding_pos[:, 1::2] = torch.cos(pos * den[:-1])  # [5000,111]
         embedding_pos = embedding_pos.unsqueeze(0)  # [1,5000,111]
-        # print("embedding_posの形状：", embedding_pos.shape)
 
         self.dropout = nn.Dropout(dropout)
         self.register_buffer('embedding_pos', embedding_pos)
 
     def forward(self, token_embedding: Tensor):
-        # print("token_embedding", token_embedding.shape)  # [18,10,111]
-        # print("embedding_posの形状", self.embedding_pos[:, :token_embedding.shape[1], :].shape)  # [1,10,111]
         return self.dropout(token_embedding + self.embedding_pos[:, :token_embedding.shape[1], :])
 
 
