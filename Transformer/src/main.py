@@ -1,6 +1,8 @@
 import math
 import sys
+import os
 
+import torch
 import torch.nn
 from torch import nn
 from torch.utils.data import DataLoader
@@ -9,6 +11,7 @@ from torchtext.data import get_tokenizer
 import time
 import numpy as np
 from collections import OrderedDict
+import pandas as pd
 
 from train import train, evaluate
 from transformer_model import Seq2seqTransformer
@@ -16,36 +19,43 @@ from preprocess import *
 from path_schema import *
 from evaluate import *
 
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+# print(torch.cuda.is_available())
+device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+# print(device)
+device = torch.device('cpu')
 
 # ファイルの読み込み
-encoder_file_path = f"{DATA_PATH}/new_beh.csv"
+# encoder_file_path = f"{DATA_PATH}/new_beh.csv"
 # decoder_file_path = f"{DATA_PATH}/hmm_annotation_list.dat"
-decoder_file_path = f"{DATA_PATH}/hmm_ant_1.csv"
-# encoder_file_path = "//fukuoka/share/YoshikazuIkeda/Transformer/data/capdata/combined_beh.csv"
-# decoder_file_path = "//fukuoka/share/YoshikazuIkeda/Transformer/data/capdata/hmm_annotation_list.dat"
+# decoder_file_path = f"{DATA_PATH}/hmm_ant_1.csv"
+encoder_file_path = "//fukuoka/share/YoshikazuIkeda/Transformer/data/edited_datas/concat_beh_v4.csv"
+decoder_file_path = "//fukuoka/share/YoshikazuIkeda/Transformer/data/edited_datas/concat_ant_v3.csv"
+# encoder_file_path = "//fukuoka/share/YoshikazuIkeda/Transformer/data/edited_datas/concat_beh.csv"
+# decoder_file_path = "//fukuoka/share/YoshikazuIkeda/Transformer/data/edited_datas/concat_ant.csv"
+test_encoder_path = "//fukuoka/share/YoshikazuIkeda/Transformer/data/edited_datas/concat_beh.csv"
+test_answer_path = "//fukuoka/share/YoshikazuIkeda/Transformer/data/edited_datas/concat_ant.csv"
 
 tokenizer_tgt = get_tokenizer("basic_english")  # 文章をすべて小文字にして単語ごとに分割する
 vocab_tgt = build_vocab(read_texts(decoder_file_path), tokenizer_tgt)  # 単語辞書の作成
 
-seq_src = read_seq(encoder_file_path)  # 入力時系列のリスト化# 1764x300x111
-
+seq_src = torch.tensor(read_seq(encoder_file_path)).to(device)  # 入力時系列のリスト化# 1764x300x111
 texts_tgt = read_texts(decoder_file_path)  # 文章をリスト化
+test_src = torch.tensor(read_seq(test_encoder_path)).to(device)
+test_ans = read_texts_ans(test_answer_path)
 
-batch_size = 10
+batch_size = 512
 PAD_IDX = vocab_tgt['<pad>']
 START_IDX = vocab_tgt['<start>']
 END_IDX = vocab_tgt['<end>']
 
 vocab_size_tgt = len(vocab_tgt)
 # print("語彙数:",vocab_size_tgt)
-embedding_size = np.array(seq_src).shape[2]  # 111
+embedding_size = seq_src.shape[2]  # 111
 nhead = 3  # 111の約数
-dim_feedforward = 512
+dim_feedforward = 256
 num_encoder_layer = 3
 num_decoder_layer = 3
-dropout = 0.1
-
+dropout = 0.3
 
 def main():
     # 訓練データの構築
@@ -122,7 +132,7 @@ def main():
         counter += 1
 
     # モデルの保存
-    torch.save(best_model.state_dict(), f'{DATA_PATH}/translation_transformer_allver.pth')
+    torch.save(best_model.state_dict(), f'{DATA_PATH}/translation_transformer_v3.pth')
     return best_model
 
 
@@ -132,24 +142,28 @@ if __name__ == "__main__":
     #     num_encoder_layer, num_decoder_layer, embedding_size, vocab_size_tgt, dim_feedforward, dropout,
     #     nhead
     # ).to(device)
-    # best_model.load_state_dict(torch.load(f'{DATA_PATH}/translation_transformer_allver.pth', map_location="cpu"))
-    shape = np.array(seq_src).shape
-    # fake_src = torch.tensor(np.random.randn(300, 111)).float()
+    # best_model.load_state_dict(torch.load(f'{DATA_PATH}/translation_transformer_v3.pth', map_location="cpu"))
+    shape = test_src.shape
+
     ##ここで学習を行う
     best_model = main()
+    print('-' * 20, 'Hyper parameters', '-' * 20)
+    print('batch size:{}, nhead:{}, dim_feedforward:{}, num_encoder_layer:{}, num_decoder_layer:{}, dropout:{}'.format(
+        batch_size, nhead, dim_feedforward, num_encoder_layer, num_decoder_layer, dropout
+    ))
+    print('-' * 50)
     mask_src = torch.zeros((shape[1], shape[1]), device=device).type(torch.bool)
-    for i in range(shape[0]):
-        seq = torch.tensor(seq_src[i]).float()
+    for i in range(30):
+        seq = torch.tensor(test_src[i]).float()
+        print("-" * 50)
         predicted_sentence = translate(model=best_model, seq=seq,
                                        vocab_tgt=vocab_tgt,
-                                       seq_len_tgt=10,  # 最大系列長
+                                       seq_len_tgt=15,  # 最大系列長
                                        START_IDX=START_IDX, END_IDX=END_IDX)
-        # list = " ".join(predicted_sentence)
-        # print(list)
-        # print('予測:{}|正解:{}'.format(' '.join(predicted_sentence).strip('<start>').strip('<end>'), texts_tgt[i]))
-
-    # fake_predict = translate(model=best_model, seq=fake_src,
-    #                          vocab_tgt=vocab_tgt,
-    #                          seq_len_tgt=10,  # 最大系列長
-    #                          START_IDX=START_IDX, END_IDX=END_IDX)
-    # print('fake:', fake_predict)
+        print("correct sentence:", test_ans[i])
+        # fake_src = torch.tensor(np.random.randn(300, 111)).float()
+        # fake_predict = translate(model=best_model, seq=fake_src,
+        #                          vocab_tgt=vocab_tgt,
+        #                          seq_len_tgt=10,  # 最大系列長
+        #                          START_IDX=START_IDX, END_IDX=END_IDX)
+        # print('fake:', fake_predict)

@@ -5,9 +5,9 @@ from main import *
 from preprocess import *
 from transformer_model import generate_square_subsequent_mask
 
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
-
+# device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+device = torch.device('cpu')
 def translate(model, seq, vocab_tgt, seq_len_tgt, START_IDX, END_IDX):
     model.eval()
 
@@ -23,7 +23,7 @@ def translate(model, seq, vocab_tgt, seq_len_tgt, START_IDX, END_IDX):
     outputs, scores = beam_search(
         model=model, src=seq,
         mask_src=mask_src, seq_len_tgt=seq_len_tgt,
-        START_IDX=START_IDX, END_IDX=END_IDX, beam_size=3
+        START_IDX=START_IDX, END_IDX=END_IDX, beam_size=4
     )
     # print(np.array(predicts).shape)
 
@@ -102,11 +102,11 @@ def beam_search(model, src, mask_src, seq_len_tgt, START_IDX, END_IDX, beam_size
         # output = output.transpose(0, 1)
         output = model.output(output)  # 1 x k x output_size
         output_t = output[-1]  # k x output_size
-        print("outputのsize:", output.shape)
-        print("output_tのsize：", output_t.shape)
+        # print("outputのsize:", output.shape)
+        # print("output_tのsize：", output_t.shape)
 
         log_probs = prev_probs + F.log_softmax(output_t, dim=-1)
-        print("log_probsのshape:", log_probs.shape)  # k x output_size
+        # print("log_probsのshape:", log_probs.shape)  # k x output_size
         scores = log_probs  # 対数尤度をスコアにする
 
         # スコアの高いビームとその単語を取得
@@ -114,16 +114,15 @@ def beam_search(model, src, mask_src, seq_len_tgt, START_IDX, END_IDX, beam_size
 
         if t == 0:
             flat_scores = flat_scores[:output_size]
-            print("flat_scoresの形状：",flat_scores.shape)
-        print("flat_scoresの形状：",flat_scores.shape)
+            # prilat_scoresの形状：",flat_scores.shape)
         # スコアのトップk個の値(top_vs)とインデックス(top_is)を保持
         top_vs, top_is = flat_scores.data.topk(k)
         beam_indices = torch.div(top_is, output_size, rounding_mode='floor')
         word_indices = top_is % output_size
 
-        print("top_is:", top_is)
-        print("beam_indicies:", beam_indices)
-        print("word_indices:", word_indices)
+        # print("top_is:", top_is)
+        # print("beam_indicies:", beam_indices)
+        # print("word_indices:", word_indices)
 
         # ビームの更新
         _next_beam_indices = []
@@ -131,9 +130,9 @@ def beam_search(model, src, mask_src, seq_len_tgt, START_IDX, END_IDX, beam_size
         for b, w in zip(beam_indices, word_indices):
             if w.item() == END_IDX:
                 k -= 1
-                print("終わりが来た時のysの形状：",ys.t().shape)
-                print("b：",b)
-                print("w：",w)
+                # print("終わりが来た時のysの形状：",ys.t().shape)
+                # print("b：",b)
+                # print("w：",w)
                 beam = torch.cat([ys.t()[b], w.view(1, )])
                 score = scores[b, w].item()
                 finished_beams.append(beam)
@@ -166,10 +165,10 @@ def beam_search(model, src, mask_src, seq_len_tgt, START_IDX, END_IDX, beam_size
         prev_probs = torch.index_select(
             flat_probs, dim=0, index=next_indices
         ).unsqueeze(1)
-        print("prev_probsのshape:", prev_probs.shape)
-        print("finished_beams:", finished_beams)
-        print("finished_scores:", finished_scores)
-        print("-" * 50)
+        # print("prev_probsのshape:", prev_probs.shape)
+        # print("finished_beams:", finished_beams)
+        # print("finished_scores:", finished_scores)
+        # print("-" * 50)
 
     # 全てのビームが完了したらデータを整形
     outputs = [[idx.item() for idx in beam[1:-1]] for beam in finished_beams]

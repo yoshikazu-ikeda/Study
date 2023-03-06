@@ -12,7 +12,9 @@ from torch.nn import (
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+# device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+device = torch.device('cpu')
 
 
 class Seq2seqTransformer(nn.Module):
@@ -81,7 +83,7 @@ class PositionalEncoding(nn.Module):
         self.register_buffer('embedding_pos', embedding_pos)
 
     def forward(self, token_embedding: Tensor):
-        return self.dropout(token_embedding + self.embedding_pos[:, :token_embedding.shape[1], :])
+        return self.dropout(token_embedding.to(device) + self.embedding_pos[:, :token_embedding.shape[1], :].to(device))
 
 
 ###マスキング###

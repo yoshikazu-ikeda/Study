@@ -2,8 +2,9 @@ from tqdm import tqdm
 
 from transformer_model import *
 
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
+# device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+device = torch.device('cpu')
 
 ###モデル学習と評価の関数定義###
 def train(model, data, optimizer, criterion, PAD_IDX):
@@ -19,12 +20,12 @@ def train(model, data, optimizer, criterion, PAD_IDX):
 
         optimizer.zero_grad()
 
-        logit = model.forward(
+        logit = model(
             src=src, tgt=input_tgt,
             mask_src=mask_src, mask_tgt=mask_tgt,
             padding_mask_src=padding_mask_src, padding_mask_tgt=padding_mask_tgt,
             memory_key_padding_mask=padding_mask_src
-        )
+        ).to(device)
 
         output_tgt = tgt[1:, :]
         loss = criterion(logit.reshape(-1, logit.shape[-1]), output_tgt.reshape(-1))
@@ -47,12 +48,12 @@ def evaluate(model, data, criterion, PAD_IDX):
 
         mask_src, mask_tgt, padding_mask_src, padding_mask_tgt = create_mask(src, input_tgt, PAD_IDX)
 
-        logit = model.forward(
+        logit = model(
             src=src, tgt=input_tgt,
             mask_src=mask_src, mask_tgt=mask_tgt,
             padding_mask_src=padding_mask_src, padding_mask_tgt=padding_mask_tgt,
             memory_key_padding_mask=padding_mask_src
-        )
+        ).to(device)
         output_tgt = tgt[1:, :]
         loss = criterion(logit.reshape(-1, logit.shape[-1]), output_tgt.reshape(-1))
         losses += loss.item()

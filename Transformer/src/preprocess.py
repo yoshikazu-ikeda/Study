@@ -10,6 +10,13 @@ def read_texts(file_path):  # デコーダーの入力となる文章をリス�
     texts = []
     with open(file_path, 'r') as file:
         for row in csv.reader(file, delimiter='\t'):
+            texts.append(row[0])
+    return texts
+
+def read_texts_ans(file_path):  # デコーダーの入力となる文章をリスト化する関数
+    texts = []
+    with open(file_path, 'r') as file:
+        for row in csv.reader(file, delimiter='\t'):
             texts.append(row[1])
     return texts
 
@@ -31,8 +38,8 @@ def read_seq(file_path):  # エンコーダーの入力となる時系列デー�
                 sequences.append(sequence)
 
                 sequence = [list(float(row[i]) for i in range(1, 112))]
-                if count == 20:
-                    break
+                # if count == 20:
+                #     break
             else:
                 if int(row[0]) > max_seq:
                     max_seq = int(row[0])
