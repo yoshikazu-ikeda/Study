@@ -1,2 +1,2 @@
 # Study
-> 大学の研究で用いたモデルを載せています.
+> Transformer/VQVAE
